@@ -1,8 +1,9 @@
 use clap::{App, Arg, crate_authors};
+use log::{LevelFilter, debug};
 use quark::BitIndex;
 use std::{
     fs::File,
-    io::{self, Read},
+    io::{self, Read, Write},
     iter,
 };
 
@@ -25,6 +26,11 @@ fn main() -> Result<(), io::Error> {
                             .required(true)
                             .help("The path to a Chip-8 program binary"))
                    .get_matches();
+
+    let mut env = env_logger::Builder::from_default_env();
+    env.format(|f, record| writeln!(f, "[{:5} {:>10}] {}", record.level(), record.target(), record.args()))
+       .filter_level(if args.occurrences_of("verbose") > 0 { LevelFilter::Debug } else { LevelFilter::Warn })
+       .init();
 
     let program = {
         // SAFETY: The 'program' argument is required, so execution will end
@@ -199,48 +205,46 @@ impl Chip8 {
     }
 
     fn step(&mut self) {
-        print!("{:03x}: ", self.pc);
         let opcode = (self.memory[self.pc] as u16) << 8 | self.memory[self.pc + 1] as u16;
-        print!("[{:04x}]  ", opcode);
         match (opcode.bits(12..16), opcode.bits(8..12), opcode.bits(4..8), opcode.bits(0..4)) {
             (0x0, 0x0, 0xe, 0x0) => {
-                println!("clearing the screen");
+                debug!(target: "executing", "{:03x}: [{:04x}]  clearing the screen", self.pc, opcode);
                 // TODO implement display
             },
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
-                println!("assign {:02x}h to V{:1x}", value, x);
+                debug!(target: "executing", "{:03x}: [{:04x}]  assign {:02x}h to V{:1x}", self.pc, opcode, value, x);
                 self.v[x] = value;
             },
             (0x7, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
-                println!("add the value {:02x}h to V{:1x}", value, x);
+                debug!(target: "executing", "{:03x}: [{:04x}]  add the value {:02x}h to V{:1x}", self.pc, opcode, value, x);
                 let value = self.v[x] as u16 + value as u16;
                 self.v[x] = (value % 256) as u8;
             }
             (0xa, ..) => {
                 let address = opcode.bits(0..12) as usize;
-                println!("assign {:03x}h to I", address);
+                debug!(target: "executing", "{:03x}: [{:04x}]  assign {:03x}h to I", self.pc, opcode, address);
                 self.i = address;
             },
             (0xd, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let y = opcode.bits(4..8) as usize;
                 let n = opcode.bits(0..4) as usize;
-                println!("draw {:1x}h byte sprite at {:03x}h to the screen at V{:1x}, V{:1x}", n, self.i, x, y);
+                debug!(target: "executing", "{:03x}: [{:04x}]  draw {:1x}h byte sprite at {:03x}h to the screen at V{:1x}, V{:1x}", self.pc, opcode, n, self.i, x, y);
                 // TODO implement display
             },
             (0xf, _, 0x2, 0x9) => {
                 let x = opcode.bits(8..12) as usize;
-                println!("assign address of digit in V{:1x} to I", x);
+                debug!(target: "executing", "{:03x}: [{:04x}]  assign address of digit in V{:1x} to I", self.pc, opcode, x);
                 let digit = self.v[x] as usize;
                 self.i = FONT_DATA_START + digit * FONT_DIGIT_SIZE;
             },
             (0xf, _, 0x3, 0x3) => {
                 let x = opcode.bits(8..12) as usize;
-                println!("assign BCD equivalent of V{:1x} ({:02x}h) to {:03x}h, {:03x}h, {:03x}h", x, self.v[x as usize], self.i, self.i + 1, self.i + 2);
+                debug!(target: "executing", "{:03x}: [{:04x}]  assign BCD equivalent of V{:1x} ({:02x}h) to {:03x}h, {:03x}h, {:03x}h", self.pc, opcode, x, self.v[x as usize], self.i, self.i + 1, self.i + 2);
                 let mut value = self.v[x as usize];
                 let ones = value % 10;
                 value /= 10;
@@ -254,14 +258,14 @@ impl Chip8 {
             },
             (0xf, _, 0x6, 0x5) => {
                 let x = opcode.bits(8..12) as usize;
-                println!("assign values starting at address {:03x}h to registers 0..={:1x}", self.i, x);
+                debug!(target: "executing", "{:03x}: [{:04x}]  assign values starting at address {:03x}h to registers 0..={:1x}", self.pc, opcode, self.i, x);
                 for i in 0..x {
                     self.v[i] = self.memory[self.i];
                     self.i += 1;
                 }
             }
             _ => {
-                println!("halting");
+                debug!("{:03x}: [{:04x}]  halting", self.pc, opcode);
                 self.halted = true;
             },
         }
