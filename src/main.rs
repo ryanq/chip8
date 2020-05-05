@@ -2,7 +2,7 @@ use clap::{App, Arg, crate_authors};
 use quark::BitIndex;
 use std::{
     fs::File,
-    io::{self, BufReader, Read},
+    io::{self, Read},
     iter,
 };
 
@@ -30,16 +30,11 @@ fn main() -> Result<(), io::Error> {
         // SAFETY: The 'program' argument is required, so execution will end
         //         before reaching this block.
         let path = args.value_of("program").unwrap();
-        let file = File::open(path)?;
-        let mut reader = BufReader::new(file);
-        iter::from_fn(move || {
-            let mut byte = [0; 1];
-            match reader.read(&mut byte) {
-                Err(_) |
-                Ok(0) => None,
-                Ok(_) => Some(byte[0]),
-            }
-        })
+        let mut file = File::open(path)?;
+        let mut buffer = Vec::with_capacity(0x1000);
+        file.read_to_end(&mut buffer)?;
+
+        buffer
     };
 
     let mut c8 = Chip8::new();
@@ -190,9 +185,10 @@ impl Chip8 {
         self.memory[start + 79] = 0x80;
     }
 
-    fn load_at(&mut self, start: usize, source: impl Iterator<Item = u8>) {
+    fn load_at(&mut self, start: usize, source: impl IntoIterator<Item = u8>) {
         self.memory.truncate(start);
-        self.memory.extend(source.chain(iter::repeat(0))
+        self.memory.extend(source.into_iter()
+                                 .chain(iter::repeat(0))
                                  .take(0x1000 - start));
     }
 
