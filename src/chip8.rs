@@ -1,10 +1,14 @@
-use log::debug;
+use log::{debug, trace};
 use quark::BitIndex;
 use std::iter;
+
+use crate::display::Display;
 
 pub const PROGRAM_START: usize = 0x200;
 const FONT_DATA_START: usize = 0x0;
 const FONT_DIGIT_SIZE: usize = 5;
+pub const SCREEN_WIDTH_PIXELS: usize = 64;
+pub const SCREEN_HEIGHT_PIXELS: usize = 32;
 
 pub struct Chip8 {
     v: [u8; 16],
@@ -43,15 +47,15 @@ impl Chip8 {
         );
     }
 
-    pub fn run(&mut self) {
-        while !self.halted {
-            self.step();
+    pub fn step(&mut self, display: &mut Display) {
+        if !self.halted {
+            self.step1(display);
         }
     }
 }
 
 impl Chip8 {
-    fn step(&mut self) {
+    fn step1(&mut self, display: &mut Display) {
         let opcode = (self.memory[self.pc] as u16) << 8 | self.memory[self.pc + 1] as u16;
         match (
             opcode.bits(12..16),
@@ -61,42 +65,74 @@ impl Chip8 {
         ) {
             (0x0, 0x0, 0xe, 0x0) => {
                 debug!("{:03x}: [{:04x}]  clearing the screen", self.pc, opcode);
-                // TODO implement display
+                display.clear_screen();
             }
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
-                debug!("{:03x}: [{:04x}]  assign {:02x}h to V{:1x}", self.pc, opcode, value, x);
+                debug!(
+                    "{:03x}: [{:04x}]  assign {:02x}h to V{:1x}",
+                    self.pc, opcode, value, x
+                );
                 self.v[x] = value;
             }
             (0x7, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
-                debug!("{:03x}: [{:04x}]  add the value {:02x}h to V{:1x}", self.pc, opcode, value, x);
+                debug!(
+                    "{:03x}: [{:04x}]  add the value {:02x}h to V{:1x}",
+                    self.pc, opcode, value, x
+                );
                 let value = self.v[x] as u16 + value as u16;
                 self.v[x] = (value % 256) as u8;
             }
             (0xa, ..) => {
                 let address = opcode.bits(0..12) as usize;
-                debug!("{:03x}: [{:04x}]  assign {:03x}h to I", self.pc, opcode, address);
+                debug!(
+                    "{:03x}: [{:04x}]  assign {:03x}h to I",
+                    self.pc, opcode, address
+                );
                 self.i = address;
             }
             (0xd, ..) => {
-                let x = opcode.bits(8..12) as usize;
-                let y = opcode.bits(4..8) as usize;
+                let vx = opcode.bits(8..12) as usize;
+                let vy = opcode.bits(4..8) as usize;
                 let n = opcode.bits(0..4) as usize;
-                debug!("{:03x}: [{:04x}]  draw {:1x}h byte sprite at {:03x}h to the screen at V{:1x}, V{:1x}", self.pc, opcode, n, self.i, x, y);
-                // TODO implement display
+                debug!(
+                    "{:03x}: [{:04x}]  draw {} byte sprite to the screen at V{:1x}, V{:1x}",
+                    self.pc, opcode, n, vx, vy
+                );
+                let sprite = self.memory.get(self.i..(self.i + n));
+                let x = self.v[vx];
+                let y = self.v[vy];
+                let toggled_off = display.draw_sprite(sprite.unwrap(), x, y);
+                if toggled_off {
+                    self.v[15] = 1;
+                } else {
+                    self.v[15] = 0;
+                }
             }
             (0xf, _, 0x2, 0x9) => {
                 let x = opcode.bits(8..12) as usize;
-                debug!("{:03x}: [{:04x}]  assign address of digit in V{:1x} to I", self.pc, opcode, x);
+                debug!(
+                    "{:03x}: [{:04x}]  assign address of digit in V{:1x} ({}) to I",
+                    self.pc, opcode, x, self.v[x]
+                );
                 let digit = self.v[x] as usize;
                 self.i = FONT_DATA_START + digit * FONT_DIGIT_SIZE;
             }
             (0xf, _, 0x3, 0x3) => {
                 let x = opcode.bits(8..12) as usize;
-                debug!("{:03x}: [{:04x}]  assign BCD equivalent of V{:1x} ({:02x}h) to {:03x}h, {:03x}h, {:03x}h", self.pc, opcode, x, self.v[x as usize], self.i, self.i + 1, self.i + 2);
+                debug!(
+                    "{:03x}: [{:04x}]  assign BCD of V{:1x} ({:02x}h) to {:03x}h, {:03x}h, {:03x}h",
+                    self.pc,
+                    opcode,
+                    x,
+                    self.v[x as usize],
+                    self.i,
+                    self.i + 1,
+                    self.i + 2
+                );
                 let mut value = self.v[x as usize];
                 let ones = value % 10;
                 value /= 10;
@@ -104,21 +140,28 @@ impl Chip8 {
                 value /= 10;
                 let hundreds = value;
 
+                trace!("digits: {}, {}, {}", hundreds, tens, ones);
                 self.memory[self.i] = hundreds;
                 self.memory[self.i + 1] = tens;
                 self.memory[self.i + 2] = ones;
             }
             (0xf, _, 0x6, 0x5) => {
                 let x = opcode.bits(8..12) as usize;
-                debug!("{:03x}: [{:04x}]  assign values starting at {:03x}h to V0..=V{:1x}", self.pc, opcode, self.i, x);
-                for i in 0..x {
-                    self.v[i] = self.memory[self.i];
+                debug!(
+                    "{:03x}: [{:04x}]  assign values starting at {:03x}h to V0..=V{:1x}",
+                    self.pc, opcode, self.i, x
+                );
+                for i in 0..=x {
+                    let value = self.memory[self.i];
+                    trace!("assigning {} (from {:03x}h) to V{}", value, self.i, i);
+                    self.v[i] = value;
                     self.i += 1;
                 }
             }
             _ => {
                 debug!("{:03x}: [{:04x}]  halting", self.pc, opcode);
                 self.halted = true;
+                return;
             }
         }
 
