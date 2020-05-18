@@ -34,11 +34,10 @@ fn main() -> Result<(), Error> {
 
         buffer
     };
+    
+    let mut c8 = Chip8::new(&program);
 
     let mut display = Display::with_resolution(SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS);
-
-    let mut c8 = Chip8::new();
-    c8.load_at(PROGRAM_START, program);
 
     let scale = match (
         args.occurrences_of(cli::SMALL),
