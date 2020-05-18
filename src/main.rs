@@ -87,12 +87,11 @@ fn main() -> Result<(), Error> {
     let mut c8 = Chip8::new();
     c8.load_at(PROGRAM_START, program);
 
-    let scale = if args.occurrences_of("small") > 0 {
-        4
-    } else if args.occurrences_of("large") > 0 {
-        16
-    } else {
-        8
+    let scale = match (args.occurrences_of("small"), args.occurrences_of("large")) {
+        (0, 0) => 8,
+        (_, 0) => 4,
+        (0, _) => 16,
+        _ => unsafe { std::hint::unreachable_unchecked() },
     };
     let mut window = Window::new(
         "CHIP-8",
