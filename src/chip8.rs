@@ -94,6 +94,16 @@ impl Chip8 {
                 );
                 self.i = address;
             }
+            (0xc, ..) => {
+                let x = opcode.bits(8..12) as usize;
+                let mask = opcode.bits(0..8) as u8;
+                debug!(
+                    "{:03x}: [{:04x}]  assign a random byte (masked by {:02x}h) to V{:1x}",
+                    self.pc, opcode, mask, x
+                );
+                let byte: u8 = rand::random();
+                self.v[x] = byte & mask;
+            }
             (0xd, ..) => {
                 let vx = opcode.bits(8..12) as usize;
                 let vy = opcode.bits(4..8) as usize;
