@@ -1,10 +1,5 @@
 use log::trace;
-use sdl2::{
-    pixels::Color,
-    rect::Rect,
-    render::Canvas,
-    video::Window,
-};
+use sdl2::{pixels::Color, rect::Rect, render::Canvas, video::Window};
 use std::fmt::{self, Formatter};
 
 pub struct Display {
