@@ -1,4 +1,10 @@
 use log::trace;
+use sdl2::{
+    pixels::Color,
+    rect::Rect,
+    render::Canvas,
+    video::Window,
+};
 use std::fmt::{self, Formatter};
 
 pub struct Display {
@@ -12,10 +18,6 @@ impl Display {
             pixels: vec![0; w * h],
             w,
         }
-    }
-
-    pub fn buffer(&self) -> &[u32] {
-        self.pixels.as_slice()
     }
 
     pub fn clear_screen(&mut self) {
@@ -50,6 +52,24 @@ impl Display {
         }
 
         toggled_off
+    }
+
+    pub fn update_screen(&self, screen: &mut Canvas<Window>, scale: u32) -> Result<(), String> {
+        screen.set_scale(scale as f32, scale as f32)?;
+        screen.set_draw_color(Color::WHITE);
+
+        let height = self.pixels.len() / self.w;
+        for y in 0..height {
+            for x in 0..self.w {
+                let index = y * self.w + x;
+                if self.pixels[index] != 0 {
+                    let pixel = Rect::new(x as i32, y as i32, 1, 1);
+                    screen.fill_rect(pixel)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

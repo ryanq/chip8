@@ -1,11 +1,13 @@
 use clap::{crate_authors, App, Arg};
 use log::LevelFilter;
-use minifb::{Window, WindowOptions};
+use sdl2::event::Event;
+use sdl2::pixels::Color;
 use std::{
     error,
     fmt::{self, Formatter},
     fs::File,
     io::{self, Read, Write},
+    thread,
     time::Duration,
 };
 
@@ -93,17 +95,41 @@ fn main() -> Result<(), Error> {
         (0, _) => 16,
         _ => unsafe { std::hint::unreachable_unchecked() },
     };
-    let mut window = Window::new(
-        "CHIP-8",
-        SCREEN_WIDTH_PIXELS * scale,
-        SCREEN_HEIGHT_PIXELS * scale,
-        WindowOptions::default(),
-    )?;
-    window.limit_update_rate(Some(Duration::from_micros(16600)));
 
-    while window.is_open() {
+    let sdl2 = sdl2::init()?;
+    let video = sdl2.video()?;
+    let window = video
+        .window(
+            "CHIP-8",
+            SCREEN_WIDTH_PIXELS as u32 * scale,
+            SCREEN_HEIGHT_PIXELS as u32 * scale,
+        )
+        .position_centered()
+        .build()?;
+
+    let mut canvas = window.into_canvas().build()?;
+    canvas.set_draw_color(Color::BLACK);
+    canvas.clear();
+    canvas.present();
+
+    let mut events = sdl2.event_pump()?;
+    'exe: loop {
+        canvas.set_draw_color(Color::BLACK);
+        canvas.clear();
+
+        for event in events.poll_iter() {
+            match event {
+                Event::Quit { .. } => break 'exe,
+                _ => {}
+            }
+        }
+
         c8.step(&mut display);
-        window.update_with_buffer(display.buffer(), SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS)?;
+
+        display.update_screen(&mut canvas, scale)?;
+        canvas.present();
+
+        thread::sleep(Duration::from_millis(1000u64 / 60));
     }
 
     Ok(())
@@ -112,14 +138,18 @@ fn main() -> Result<(), Error> {
 #[derive(Debug)]
 enum Error {
     IO(io::Error),
-    UI(minifb::Error),
+    S(String),
+    Sdl(sdl2::IntegerOrSdlError),
+    Win(sdl2::video::WindowBuildError),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Error::IO(e) => write!(f, "I/O error: {}", e),
-            Error::UI(e) => write!(f, "error: {}", e),
+            Error::S(s) => write!(f, "error: {}", s),
+            Error::Sdl(e) => write!(f, "SDL error: {}", e),
+            Error::Win(e) => write!(f, "error building a window: {}", e),
         }
     }
 }
@@ -132,8 +162,20 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<minifb::Error> for Error {
-    fn from(inner: minifb::Error) -> Error {
-        Error::UI(inner)
+impl From<String> for Error {
+    fn from(s: String) -> Error {
+        Error::S(s)
+    }
+}
+
+impl From<sdl2::video::WindowBuildError> for Error {
+    fn from(inner: sdl2::video::WindowBuildError) -> Error {
+        Error::Win(inner)
+    }
+}
+
+impl From<sdl2::IntegerOrSdlError> for Error {
+    fn from(inner: sdl2::IntegerOrSdlError) -> Error {
+        Error::Sdl(inner)
     }
 }

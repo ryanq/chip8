@@ -48,14 +48,10 @@ impl Chip8 {
     }
 
     pub fn step(&mut self, display: &mut Display) {
-        if !self.halted {
-            self.step1(display);
+        if self.halted {
+            return;
         }
-    }
-}
 
-impl Chip8 {
-    fn step1(&mut self, display: &mut Display) {
         let opcode = (self.memory[self.pc] as u16) << 8 | self.memory[self.pc + 1] as u16;
         match (
             opcode.bits(12..16),
