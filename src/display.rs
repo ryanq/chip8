@@ -1,6 +1,6 @@
 use {
     crate::Error,
-    log::trace,
+    log::{log_enabled, trace, Level},
     sdl2::{pixels::Color, rect::Rect, render::Canvas, video::Window, Sdl},
     std::fmt::{self, Formatter},
 };
@@ -39,7 +39,6 @@ impl Display {
             *pixel = 0;
         }
 
-        self.present()?;
         Ok(())
     }
 
@@ -68,12 +67,15 @@ impl Display {
             }
         }
 
-        self.present()?;
-
         Ok(toggled_off)
     }
 
     pub fn present(&mut self) -> Result<(), String> {
+        trace!("updating window buffer");
+        if log_enabled!(Level::Trace) {
+            println!("{}", self);
+        }
+
         let scale = self.scale as f32;
         self.canvas.set_scale(scale, scale)?;
 

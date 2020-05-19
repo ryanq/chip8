@@ -1,5 +1,6 @@
 use {
     crate::Error,
+    log::trace,
     sdl2::{event::Event, keyboard::Keycode, EventPump, Sdl},
     std::{thread, time::Duration},
 };
@@ -26,8 +27,12 @@ impl Input {
     pub fn handle_input(&mut self) {
         let events = self.events.poll_iter().collect::<Vec<_>>();
         for event in events {
+            trace!("processing event {:?}", event);
             match event {
-                Event::Quit { .. } => self.quit = true,
+                Event::Quit { .. } => {
+                    self.quit = true;
+                    break;
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::Num1),
                     repeat: false,
@@ -198,6 +203,9 @@ impl Input {
 
         while self.last_key.is_none() {
             self.handle_input();
+            if self.quit {
+                return 0;
+            }
 
             thread::sleep(Duration::from_millis(5));
         }

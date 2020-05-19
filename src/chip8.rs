@@ -53,6 +53,7 @@ impl Chip8 {
             }
 
             self.step()?;
+            self.display.present()?;
 
             thread::sleep(CYCLE_RATE);
         }
