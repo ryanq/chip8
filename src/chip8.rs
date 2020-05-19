@@ -1,9 +1,5 @@
 use {
-    crate::{
-        display::Display,
-        input::Input,
-        Error,
-    },
+    crate::{display::Display, input::Input, Error},
     log::{debug, trace},
     quark::BitIndex,
     std::thread,
@@ -55,7 +51,7 @@ impl Chip8 {
             if self.input.quit {
                 break;
             }
-            
+
             self.step()?;
 
             thread::sleep(CYCLE_RATE);
@@ -81,6 +77,15 @@ impl Chip8 {
             (0x0, 0x0, 0xe, 0x0) => {
                 debug!("{:03x}: [{:04x}]  clearing the screen", self.pc, opcode);
                 self.display.clear_screen()?;
+            }
+            (0x1, ..) => {
+                let address = opcode.bits(0..12) as usize;
+                debug!(
+                    "{:03x}: [{:04x}]  jump to {:03x}h",
+                    self.pc, opcode, address
+                );
+                self.pc = address;
+                return Ok(());
             }
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
