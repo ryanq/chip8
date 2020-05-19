@@ -99,10 +99,10 @@ impl Chip8 {
                     "{:03x}: [{:04x}]  draw {} byte sprite to the screen at V{:1x}, V{:1x}",
                     self.pc, opcode, n, vx, vy
                 );
-                let sprite = self.memory.get(self.i..(self.i + n));
+                let sprite = &self.memory[self.i..][..n];
                 let x = self.v[vx];
                 let y = self.v[vy];
-                let toggled_off = self.display.draw_sprite(sprite.unwrap(), x, y);
+                let toggled_off = self.display.draw_sprite(sprite, x, y);
                 if toggled_off {
                     self.v[15] = 1;
                 } else {
