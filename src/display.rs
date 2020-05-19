@@ -14,7 +14,7 @@ pub struct Display {
 }
 
 impl Display {
-    pub fn new(sdl: Sdl, gui_scale: u32, width: u32, height: u32) -> Result<Display, Error> {
+    pub fn new(sdl: &Sdl, gui_scale: u32, width: u32, height: u32) -> Result<Display, Error> {
         let (w, h) = (width as usize, height as usize);
         let scale = gui_scale as usize;
 
@@ -71,8 +71,11 @@ impl Display {
     pub fn present(&mut self) -> Result<(), String> {
         let scale = self.scale as f32;
         self.canvas.set_scale(scale, scale)?;
-        self.canvas.set_draw_color(Color::WHITE);
 
+        self.canvas.set_draw_color(Color::BLACK);
+        self.canvas.clear();
+        
+        self.canvas.set_draw_color(Color::WHITE);
         for y in 0..self.h {
             for x in 0..self.w {
                 let index = y * self.w + x;
@@ -82,6 +85,8 @@ impl Display {
                 }
             }
         }
+
+        self.canvas.present();
 
         Ok(())
     }

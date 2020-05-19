@@ -1,5 +1,9 @@
 use {
-    crate::{display::Display, Error},
+    crate::{
+        display::Display,
+        keyboard::{Action, Keyboard},
+        Error,
+    },
     log::{debug, trace},
     quark::BitIndex,
     std::thread,
@@ -16,6 +20,7 @@ pub struct Chip8 {
     pc: usize,
     memory: Vec<u8>,
     display: Display,
+    keyboard: Keyboard,
     halted: bool,
 }
 
@@ -25,7 +30,8 @@ impl Chip8 {
     pub fn new(program: &[u8], gui_scale: u32) -> Result<Chip8, Error> {
         let sdl = sdl2::init()?;
 
-        let display = Display::new(sdl, gui_scale, SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS)?;
+        let display = Display::new(&sdl, gui_scale, SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS)?;
+        let keyboard = Keyboard::new(&sdl)?;
 
         let mut memory = vec![0; 0x1000];
         memory[0..][..FONT_DATA.len()].copy_from_slice(FONT_DATA);
@@ -37,15 +43,24 @@ impl Chip8 {
             pc: PROGRAM_START,
             memory,
             display,
+            keyboard,
             halted: false,
         })
     }
 
     pub fn run(&mut self) -> Result<(), Error> {
         loop {
+            if self.keyboard.handle_input() == Action::Quit {
+                break;
+            }
+
             self.step()?;
+            self.display.present()?;
+
             thread::sleep(CYCLE_RATE);
         }
+
+        Ok(())
     }
 }
 
@@ -65,7 +80,6 @@ impl Chip8 {
             (0x0, 0x0, 0xe, 0x0) => {
                 debug!("{:03x}: [{:04x}]  clearing the screen", self.pc, opcode);
                 self.display.clear_screen();
-                self.display.present()?;
             }
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
@@ -121,7 +135,6 @@ impl Chip8 {
                 } else {
                     self.v[15] = 0;
                 }
-                self.display.present()?;
             }
             (0xf, _, 0x2, 0x9) => {
                 let x = opcode.bits(8..12) as usize;

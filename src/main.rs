@@ -1,6 +1,7 @@
 mod chip8;
 mod cli;
 mod display;
+mod keyboard;
 
 use {
     chip8::Chip8,
