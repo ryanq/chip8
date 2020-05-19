@@ -1,6 +1,4 @@
 use log::info;
-use sdl2::event::Event;
-use sdl2::pixels::Color;
 use std::{
     error,
     fmt::{self, Formatter},
@@ -15,7 +13,6 @@ mod cli;
 mod display;
 
 use chip8::*;
-use display::*;
 
 fn main() -> Result<(), Error> {
     let args = cli::process_arguments();
@@ -34,62 +31,20 @@ fn main() -> Result<(), Error> {
 
         buffer
     };
+
+    let gui_scale = if args.occurrences_of(cli::SMALL) != 0 { 4 }
+                    else if args.occurrences_of(cli::LARGE) != 0 { 16 }
+                    else { 8 };
     
-    let mut c8 = Chip8::new(&program);
-
-    let mut display = Display::with_resolution(SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS);
-
-    let scale = match (
-        args.occurrences_of(cli::SMALL),
-        args.occurrences_of(cli::LARGE),
-    ) {
-        (0, 0) => 8,
-        (_, 0) => 4,
-        (0, _) => 16,
-        _ => unsafe { std::hint::unreachable_unchecked() },
-    };
-
-    let sdl2 = sdl2::init()?;
-    let video = sdl2.video()?;
-    let window = video
-        .window(
-            "CHIP-8",
-            SCREEN_WIDTH_PIXELS as u32 * scale,
-            SCREEN_HEIGHT_PIXELS as u32 * scale,
-        )
-        .position_centered()
-        .build()?;
-
-    let mut canvas = window.into_canvas().build()?;
-    canvas.set_draw_color(Color::BLACK);
-    canvas.clear();
-    canvas.present();
-
-    let mut events = sdl2.event_pump()?;
-    'exe: loop {
-        canvas.set_draw_color(Color::BLACK);
-        canvas.clear();
-
-        for event in events.poll_iter() {
-            match event {
-                Event::Quit { .. } => break 'exe,
-                _ => {}
-            }
-        }
-
-        c8.step(&mut display);
-
-        display.update_screen(&mut canvas, scale)?;
-        canvas.present();
-
+    let mut c8 = Chip8::new(&program, gui_scale)?;
+    loop {
+        c8.step()?;
         thread::sleep(Duration::from_millis(1000u64 / 60));
     }
-
-    Ok(())
 }
 
 #[derive(Debug)]
-enum Error {
+pub enum Error {
     IO(io::Error),
     S(String),
     Sdl(sdl2::IntegerOrSdlError),
