@@ -10,8 +10,6 @@ use {
         fmt::{self, Formatter},
         fs::File,
         io::{self, Read},
-        thread,
-        time::Duration,
     },
 };
 
@@ -42,10 +40,9 @@ fn main() -> Result<(), Error> {
     };
 
     let mut c8 = Chip8::new(&program, gui_scale)?;
-    loop {
-        c8.step()?;
-        thread::sleep(Duration::from_millis(1000u64 / 60));
-    }
+    c8.run()?;
+
+    Ok(())
 }
 
 #[derive(Debug)]

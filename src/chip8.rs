@@ -2,6 +2,8 @@ use {
     crate::{display::Display, Error},
     log::{debug, trace},
     quark::BitIndex,
+    std::thread,
+    std::time::Duration,
 };
 
 const PROGRAM_START: usize = 0x200;
@@ -16,6 +18,8 @@ pub struct Chip8 {
     display: Display,
     halted: bool,
 }
+
+const CYCLE_RATE: Duration = Duration::from_nanos(1_000_000 / 60);
 
 impl Chip8 {
     pub fn new(program: &[u8], gui_scale: u32) -> Result<Chip8, Error> {
@@ -37,7 +41,16 @@ impl Chip8 {
         })
     }
 
-    pub fn step(&mut self) -> Result<(), Error> {
+    pub fn run(&mut self) -> Result<(), Error> {
+        loop {
+            self.step()?;
+            thread::sleep(CYCLE_RATE);
+        }
+    }
+}
+
+impl Chip8 {
+    fn step(&mut self) -> Result<(), Error> {
         if self.halted {
             return Ok(());
         }
