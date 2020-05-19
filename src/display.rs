@@ -34,13 +34,16 @@ impl Display {
         })
     }
 
-    pub fn clear_screen(&mut self) {
+    pub fn clear_screen(&mut self) -> Result<(), Error> {
         for pixel in self.pixels.iter_mut() {
             *pixel = 0;
         }
+
+        self.present()?;
+        Ok(())
     }
 
-    pub fn draw_sprite(&mut self, sprite: &[u8], x: u8, y: u8) -> bool {
+    pub fn draw_sprite(&mut self, sprite: &[u8], x: u8, y: u8) -> Result<bool, Error> {
         let x = x as usize;
         let y = y as usize;
         let mut toggled_off = false;
@@ -65,7 +68,9 @@ impl Display {
             }
         }
 
-        toggled_off
+        self.present()?;
+
+        Ok(toggled_off)
     }
 
     pub fn present(&mut self) -> Result<(), String> {
@@ -74,7 +79,7 @@ impl Display {
 
         self.canvas.set_draw_color(Color::BLACK);
         self.canvas.clear();
-        
+
         self.canvas.set_draw_color(Color::WHITE);
         for y in 0..self.h {
             for x in 0..self.w {

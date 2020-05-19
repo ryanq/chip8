@@ -1,7 +1,7 @@
 use {
     crate::{
         display::Display,
-        keyboard::{Action, Keyboard},
+        input::Input,
         Error,
     },
     log::{debug, trace},
@@ -20,7 +20,7 @@ pub struct Chip8 {
     pc: usize,
     memory: Vec<u8>,
     display: Display,
-    keyboard: Keyboard,
+    input: Input,
     halted: bool,
 }
 
@@ -31,7 +31,7 @@ impl Chip8 {
         let sdl = sdl2::init()?;
 
         let display = Display::new(&sdl, gui_scale, SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS)?;
-        let keyboard = Keyboard::new(&sdl)?;
+        let input = Input::new(&sdl)?;
 
         let mut memory = vec![0; 0x1000];
         memory[0..][..FONT_DATA.len()].copy_from_slice(FONT_DATA);
@@ -43,19 +43,20 @@ impl Chip8 {
             pc: PROGRAM_START,
             memory,
             display,
-            keyboard,
+            input,
             halted: false,
         })
     }
 
     pub fn run(&mut self) -> Result<(), Error> {
+        self.display.present()?;
         loop {
-            if self.keyboard.handle_input() == Action::Quit {
+            self.input.handle_input();
+            if self.input.quit {
                 break;
             }
-
+            
             self.step()?;
-            self.display.present()?;
 
             thread::sleep(CYCLE_RATE);
         }
@@ -79,7 +80,7 @@ impl Chip8 {
         ) {
             (0x0, 0x0, 0xe, 0x0) => {
                 debug!("{:03x}: [{:04x}]  clearing the screen", self.pc, opcode);
-                self.display.clear_screen();
+                self.display.clear_screen()?;
             }
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
@@ -129,12 +130,21 @@ impl Chip8 {
                 let sprite = &self.memory[self.i..][..n];
                 let x = self.v[vx];
                 let y = self.v[vy];
-                let toggled_off = self.display.draw_sprite(sprite, x, y);
+                let toggled_off = self.display.draw_sprite(sprite, x, y)?;
                 if toggled_off {
                     self.v[15] = 1;
                 } else {
                     self.v[15] = 0;
                 }
+            }
+            (0xf, _, 0x0, 0xa) => {
+                let x = opcode.bits(8..12) as usize;
+                debug!(
+                    "{:03x}: [{:04x}]  wait for keypress and assign value to V{:1x}",
+                    self.pc, opcode, x
+                );
+                let value = self.input.wait_for_input();
+                self.v[x] = value;
             }
             (0xf, _, 0x2, 0x9) => {
                 let x = opcode.bits(8..12) as usize;
