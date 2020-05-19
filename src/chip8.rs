@@ -88,6 +88,18 @@ impl Chip8 {
                 self.pc = address;
                 return Ok(());
             }
+            (0x3, ..) => {
+                let x = opcode.bits(8..12) as usize;
+                let value = opcode.bits(0..8) as u8;
+                debug!(
+                    "{:03x}: [{:04x}]  skip next instruction if V{:1x} equals {:02x}h",
+                    self.pc, opcode, x, value
+                );
+                if self.v[x] == value {
+                    self.pc += 4;
+                    return Ok(());
+                }
+            }
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
