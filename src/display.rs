@@ -1,23 +1,37 @@
-use log::trace;
-use sdl2::{
-    pixels::Color,
-    rect::Rect,
-    render::Canvas,
-    video::Window,
+use {
+    crate::Error,
+    log::trace,
+    sdl2::{pixels::Color, rect::Rect, render::Canvas, video::Window, Sdl},
+    std::fmt::{self, Formatter},
 };
-use std::fmt::{self, Formatter};
 
 pub struct Display {
-    pixels: Vec<u32>,
     w: usize,
+    h: usize,
+    scale: usize,
+    pixels: Vec<u8>,
+    canvas: Canvas<Window>,
 }
 
 impl Display {
-    pub fn with_resolution(w: usize, h: usize) -> Display {
-        Display {
-            pixels: vec![0; w * h],
+    pub fn new(sdl: &Sdl, gui_scale: u32, width: u32, height: u32) -> Result<Display, Error> {
+        let (w, h) = (width as usize, height as usize);
+        let scale = gui_scale as usize;
+
+        let video = sdl.video()?;
+        let window = video
+            .window("CHIP-8", width * gui_scale, height * gui_scale)
+            .position_centered()
+            .build()?;
+        let canvas = window.into_canvas().build()?;
+
+        Ok(Display {
             w,
-        }
+            h,
+            scale,
+            pixels: vec![0; w * h],
+            canvas,
+        })
     }
 
     pub fn clear_screen(&mut self) {
@@ -39,7 +53,7 @@ impl Display {
                 if byte & 1 != 0 {
                     let index = (y + dy) * self.w + (x + dx);
                     match self.pixels[index] {
-                        0 => self.pixels[index] = 0x00ff_ffff,
+                        0 => self.pixels[index] = 1,
                         1 => {
                             self.pixels[index] = 0;
                             toggled_off = true;
@@ -54,20 +68,25 @@ impl Display {
         toggled_off
     }
 
-    pub fn update_screen(&self, screen: &mut Canvas<Window>, scale: u32) -> Result<(), String> {
-        screen.set_scale(scale as f32, scale as f32)?;
-        screen.set_draw_color(Color::WHITE);
+    pub fn present(&mut self) -> Result<(), String> {
+        let scale = self.scale as f32;
+        self.canvas.set_scale(scale, scale)?;
 
-        let height = self.pixels.len() / self.w;
-        for y in 0..height {
+        self.canvas.set_draw_color(Color::BLACK);
+        self.canvas.clear();
+        
+        self.canvas.set_draw_color(Color::WHITE);
+        for y in 0..self.h {
             for x in 0..self.w {
                 let index = y * self.w + x;
                 if self.pixels[index] != 0 {
                     let pixel = Rect::new(x as i32, y as i32, 1, 1);
-                    screen.fill_rect(pixel)?;
+                    self.canvas.fill_rect(pixel)?;
                 }
             }
         }
+
+        self.canvas.present();
 
         Ok(())
     }

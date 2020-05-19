@@ -1,55 +1,73 @@
-use log::{debug, trace};
-use quark::BitIndex;
-use std::iter;
+use {
+    crate::{
+        display::Display,
+        keyboard::{Action, Keyboard},
+        Error,
+    },
+    log::{debug, trace},
+    quark::BitIndex,
+    std::thread,
+    std::time::Duration,
+};
 
-use crate::display::Display;
-
-pub const PROGRAM_START: usize = 0x200;
-const FONT_DATA_START: usize = 0x0;
-const FONT_DIGIT_SIZE: usize = 5;
-pub const SCREEN_WIDTH_PIXELS: usize = 64;
-pub const SCREEN_HEIGHT_PIXELS: usize = 32;
+const PROGRAM_START: usize = 0x200;
+pub const SCREEN_WIDTH_PIXELS: u32 = 64;
+pub const SCREEN_HEIGHT_PIXELS: u32 = 32;
 
 pub struct Chip8 {
     v: [u8; 16],
     i: usize,
     pc: usize,
     memory: Vec<u8>,
+    display: Display,
+    keyboard: Keyboard,
     halted: bool,
 }
 
-impl Default for Chip8 {
-    fn default() -> Chip8 {
-        Chip8 {
+const CYCLE_RATE: Duration = Duration::from_nanos(1_000_000 / 60);
+
+impl Chip8 {
+    pub fn new(program: &[u8], gui_scale: u32) -> Result<Chip8, Error> {
+        let sdl = sdl2::init()?;
+
+        let display = Display::new(&sdl, gui_scale, SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS)?;
+        let keyboard = Keyboard::new(&sdl)?;
+
+        let mut memory = vec![0; 0x1000];
+        memory[0..][..FONT_DATA.len()].copy_from_slice(FONT_DATA);
+        memory[PROGRAM_START..][..program.len()].copy_from_slice(program);
+
+        Ok(Chip8 {
             v: [0; 16],
             i: 0,
             pc: PROGRAM_START,
-            memory: vec![0; 0x1000],
+            memory,
+            display,
+            keyboard,
             halted: false,
+        })
+    }
+
+    pub fn run(&mut self) -> Result<(), Error> {
+        loop {
+            if self.keyboard.handle_input() == Action::Quit {
+                break;
+            }
+
+            self.step()?;
+            self.display.present()?;
+
+            thread::sleep(CYCLE_RATE);
         }
+
+        Ok(())
     }
 }
 
 impl Chip8 {
-    pub fn new() -> Chip8 {
-        let mut c8 = Chip8::default();
-        c8.load_font_data_at(FONT_DATA_START);
-        c8
-    }
-
-    pub fn load_at(&mut self, start: usize, source: impl IntoIterator<Item = u8>) {
-        self.memory.truncate(start);
-        self.memory.extend(
-            source
-                .into_iter()
-                .chain(iter::repeat(0))
-                .take(0x1000 - start),
-        );
-    }
-
-    pub fn step(&mut self, display: &mut Display) {
+    fn step(&mut self) -> Result<(), Error> {
         if self.halted {
-            return;
+            return Ok(());
         }
 
         let opcode = (self.memory[self.pc] as u16) << 8 | self.memory[self.pc + 1] as u16;
@@ -61,7 +79,7 @@ impl Chip8 {
         ) {
             (0x0, 0x0, 0xe, 0x0) => {
                 debug!("{:03x}: [{:04x}]  clearing the screen", self.pc, opcode);
-                display.clear_screen();
+                self.display.clear_screen();
             }
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
@@ -108,10 +126,10 @@ impl Chip8 {
                     "{:03x}: [{:04x}]  draw {} byte sprite to the screen at V{:1x}, V{:1x}",
                     self.pc, opcode, n, vx, vy
                 );
-                let sprite = self.memory.get(self.i..(self.i + n));
+                let sprite = &self.memory[self.i..][..n];
                 let x = self.v[vx];
                 let y = self.v[vy];
-                let toggled_off = display.draw_sprite(sprite.unwrap(), x, y);
+                let toggled_off = self.display.draw_sprite(sprite, x, y);
                 if toggled_off {
                     self.v[15] = 1;
                 } else {
@@ -167,124 +185,33 @@ impl Chip8 {
             _ => {
                 debug!("{:03x}: [{:04x}]  halting", self.pc, opcode);
                 self.halted = true;
-                return;
+                return Ok(());
             }
         }
 
         self.pc += 2;
-    }
 
-    fn load_font_data_at(&mut self, start: usize) {
-        // digit 0
-        self.memory[start + 0] = 0xf0;
-        self.memory[start + 1] = 0x90;
-        self.memory[start + 2] = 0x90;
-        self.memory[start + 3] = 0x90;
-        self.memory[start + 4] = 0xf0;
-
-        // digit 1
-        self.memory[start + 5] = 0x20;
-        self.memory[start + 6] = 0x60;
-        self.memory[start + 7] = 0x20;
-        self.memory[start + 8] = 0x20;
-        self.memory[start + 9] = 0x70;
-
-        // digit 2
-        self.memory[start + 10] = 0xf0;
-        self.memory[start + 11] = 0x10;
-        self.memory[start + 12] = 0xf0;
-        self.memory[start + 13] = 0x80;
-        self.memory[start + 14] = 0xf0;
-
-        // digit 3
-        self.memory[start + 15] = 0xf0;
-        self.memory[start + 16] = 0x10;
-        self.memory[start + 17] = 0xf0;
-        self.memory[start + 18] = 0x10;
-        self.memory[start + 19] = 0xf0;
-
-        // digit 4
-        self.memory[start + 20] = 0x90;
-        self.memory[start + 21] = 0x90;
-        self.memory[start + 22] = 0xf0;
-        self.memory[start + 23] = 0x10;
-        self.memory[start + 24] = 0x10;
-
-        // digit 5
-        self.memory[start + 25] = 0xf0;
-        self.memory[start + 26] = 0x80;
-        self.memory[start + 27] = 0xf0;
-        self.memory[start + 28] = 0x10;
-        self.memory[start + 29] = 0xf0;
-
-        // digit 6
-        self.memory[start + 30] = 0xf0;
-        self.memory[start + 31] = 0x80;
-        self.memory[start + 32] = 0xf0;
-        self.memory[start + 33] = 0x90;
-        self.memory[start + 34] = 0xf0;
-
-        // digit 7
-        self.memory[start + 35] = 0xf0;
-        self.memory[start + 36] = 0x10;
-        self.memory[start + 37] = 0x20;
-        self.memory[start + 38] = 0x40;
-        self.memory[start + 39] = 0x40;
-
-        // digit 8
-        self.memory[start + 40] = 0xf0;
-        self.memory[start + 41] = 0x90;
-        self.memory[start + 42] = 0xf0;
-        self.memory[start + 43] = 0x90;
-        self.memory[start + 44] = 0xf0;
-
-        // digit 9
-        self.memory[start + 45] = 0xf0;
-        self.memory[start + 46] = 0x90;
-        self.memory[start + 47] = 0xf0;
-        self.memory[start + 48] = 0x10;
-        self.memory[start + 49] = 0xf0;
-
-        // digit A
-        self.memory[start + 50] = 0xf0;
-        self.memory[start + 51] = 0x90;
-        self.memory[start + 52] = 0xf0;
-        self.memory[start + 53] = 0x90;
-        self.memory[start + 54] = 0x90;
-
-        // digit B
-        self.memory[start + 55] = 0xe0;
-        self.memory[start + 56] = 0x90;
-        self.memory[start + 57] = 0xe0;
-        self.memory[start + 58] = 0x90;
-        self.memory[start + 59] = 0xe0;
-
-        // digit C
-        self.memory[start + 60] = 0xf0;
-        self.memory[start + 61] = 0x80;
-        self.memory[start + 62] = 0x80;
-        self.memory[start + 63] = 0x80;
-        self.memory[start + 64] = 0xf0;
-
-        // digit D
-        self.memory[start + 65] = 0xe0;
-        self.memory[start + 66] = 0x90;
-        self.memory[start + 67] = 0x90;
-        self.memory[start + 68] = 0x90;
-        self.memory[start + 69] = 0xe0;
-
-        // digit E
-        self.memory[start + 70] = 0xf0;
-        self.memory[start + 71] = 0x80;
-        self.memory[start + 72] = 0xf0;
-        self.memory[start + 73] = 0x80;
-        self.memory[start + 74] = 0xf0;
-
-        // digit F
-        self.memory[start + 75] = 0xf0;
-        self.memory[start + 76] = 0x80;
-        self.memory[start + 77] = 0xf0;
-        self.memory[start + 78] = 0x80;
-        self.memory[start + 79] = 0x80;
+        Ok(())
     }
 }
+
+static FONT_DATA: &[u8] = &[
+    0xf0, 0x90, 0x90, 0x90, 0xf0, // digit 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // digit 1
+    0xf0, 0x10, 0xf0, 0x80, 0xf0, // digit 2
+    0xf0, 0x10, 0xf0, 0x10, 0xf0, // digit 3
+    0x90, 0x90, 0xf0, 0x10, 0x10, // digit 4
+    0xf0, 0x80, 0xf0, 0x10, 0xf0, // digit 5
+    0xf0, 0x80, 0xf0, 0x90, 0xf0, // digit 6
+    0xf0, 0x10, 0x20, 0x40, 0x40, // digit 7
+    0xf0, 0x90, 0xf0, 0x90, 0xf0, // digit 8
+    0xf0, 0x90, 0xf0, 0x10, 0xf0, // digit 9
+    0xf0, 0x90, 0xf0, 0x90, 0x90, // digit A
+    0xe0, 0x90, 0xe0, 0x90, 0xe0, // digit B
+    0xf0, 0x80, 0x80, 0x80, 0xf0, // digit C
+    0xe0, 0x90, 0x90, 0x90, 0xe0, // digit D
+    0xf0, 0x80, 0xf0, 0x80, 0xf0, // digit E
+    0xf0, 0x80, 0xf0, 0x80, 0x80, // digit F
+];
+const FONT_DATA_START: usize = 0x0;
+const FONT_DIGIT_SIZE: usize = 5;
