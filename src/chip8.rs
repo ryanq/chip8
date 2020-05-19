@@ -1,6 +1,8 @@
-use log::{debug, trace};
-use quark::BitIndex;
-use crate::{Error, display::Display};
+use {
+    crate::{display::Display, Error},
+    log::{debug, trace},
+    quark::BitIndex,
+};
 
 const PROGRAM_START: usize = 0x200;
 pub const SCREEN_WIDTH_PIXELS: u32 = 64;

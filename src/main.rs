@@ -1,18 +1,19 @@
-use log::info;
-use std::{
-    error,
-    fmt::{self, Formatter},
-    fs::File,
-    io::{self, Read},
-    thread,
-    time::Duration,
-};
-
 mod chip8;
 mod cli;
 mod display;
 
-use chip8::*;
+use {
+    chip8::Chip8,
+    log::info,
+    std::{
+        error,
+        fmt::{self, Formatter},
+        fs::File,
+        io::{self, Read},
+        thread,
+        time::Duration,
+    },
+};
 
 fn main() -> Result<(), Error> {
     let args = cli::process_arguments();
@@ -32,10 +33,14 @@ fn main() -> Result<(), Error> {
         buffer
     };
 
-    let gui_scale = if args.occurrences_of(cli::SMALL) != 0 { 4 }
-                    else if args.occurrences_of(cli::LARGE) != 0 { 16 }
-                    else { 8 };
-    
+    let gui_scale = if args.occurrences_of(cli::SMALL) != 0 {
+        4
+    } else if args.occurrences_of(cli::LARGE) != 0 {
+        16
+    } else {
+        8
+    };
+
     let mut c8 = Chip8::new(&program, gui_scale)?;
     loop {
         c8.step()?;

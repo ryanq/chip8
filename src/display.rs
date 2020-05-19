@@ -1,7 +1,9 @@
-use log::trace;
-use sdl2::{Sdl, pixels::Color, rect::Rect, render::Canvas, video::Window};
-use std::fmt::{self, Formatter};
-use crate::Error;
+use {
+    crate::Error,
+    log::trace,
+    sdl2::{pixels::Color, rect::Rect, render::Canvas, video::Window, Sdl},
+    std::fmt::{self, Formatter},
+};
 
 pub struct Display {
     w: usize,
@@ -17,9 +19,10 @@ impl Display {
         let scale = gui_scale as usize;
 
         let video = sdl.video()?;
-        let window = video.window("CHIP-8", width * gui_scale, height * gui_scale)
-                        .position_centered()
-                        .build()?;
+        let window = video
+            .window("CHIP-8", width * gui_scale, height * gui_scale)
+            .position_centered()
+            .build()?;
         let canvas = window.into_canvas().build()?;
 
         Ok(Display {
