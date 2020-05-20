@@ -93,22 +93,39 @@ impl Chip8 {
             }
             (0x2, ..) => {
                 let address = opcode.bits(0..12) as usize;
-                debug!("{:03x}: [{:04x}]  call subroutine at {:03x}h", self.pc, opcode, address);
+                debug!(
+                    "{:03x}: [{:04x}]  call subroutine at {:03x}h",
+                    self.pc, opcode, address
+                );
                 self.sp += 2;
                 let bytes = self.pc.to_be_bytes();
                 self.memory[self.sp] = bytes[0];
                 self.memory[self.sp + 1] = bytes[1];
                 self.pc = address;
-                return Ok(())
+                return Ok(());
             }
             (0x3, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
                 debug!(
-                    "{:03x}: [{:04x}]  skip next instruction if V{:1x} equals {:02x}h",
+                    "{:03x}: [{:04x}]  skip next instruction if V{:1x} == {:02x}h",
                     self.pc, opcode, x, value
                 );
                 if self.v[x] == value {
+                    trace!("skipping instruction at {:03x}h", self.pc + 2);
+                    self.pc += 4;
+                    return Ok(());
+                }
+            }
+            (0x4, ..) => {
+                let x = opcode.bits(8..12) as usize;
+                let value = opcode.bits(0..8) as u8;
+                debug!(
+                    "{:03x}: [{:04x}]  skip next instruction if V{:1x} != {:02x}h",
+                    self.pc, opcode, x, value
+                );
+                if self.v[x] != value {
+                    trace!("skipping instruction at {:03x}h", self.pc + 2);
                     self.pc += 4;
                     return Ok(());
                 }
