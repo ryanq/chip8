@@ -7,6 +7,7 @@ use {
 };
 
 const PROGRAM_START: usize = 0x200;
+const STACK_START: usize = PROGRAM_START - 32;
 pub const SCREEN_WIDTH_PIXELS: u32 = 64;
 pub const SCREEN_HEIGHT_PIXELS: u32 = 32;
 
@@ -14,6 +15,7 @@ pub struct Chip8 {
     v: [u8; 16],
     i: usize,
     pc: usize,
+    sp: usize,
     memory: Vec<u8>,
     display: Display,
     input: Input,
@@ -37,6 +39,7 @@ impl Chip8 {
             v: [0; 16],
             i: 0,
             pc: PROGRAM_START,
+            sp: STACK_START,
             memory,
             display,
             input,
@@ -87,6 +90,16 @@ impl Chip8 {
                 );
                 self.pc = address;
                 return Ok(());
+            }
+            (0x2, ..) => {
+                let address = opcode.bits(0..12) as usize;
+                debug!("{:03x}: [{:04x}]  call subroutine at {:03x}h", self.pc, opcode, address);
+                self.sp += 2;
+                let bytes = self.pc.to_be_bytes();
+                self.memory[self.sp] = bytes[0];
+                self.memory[self.sp + 1] = bytes[1];
+                self.pc = address;
+                return Ok(())
             }
             (0x3, ..) => {
                 let x = opcode.bits(8..12) as usize;
