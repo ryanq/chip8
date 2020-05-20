@@ -71,7 +71,10 @@ impl Chip8 {
             return Ok(());
         }
 
-        let opcode = (self.memory[self.pc] as u16) << 8 | self.memory[self.pc + 1] as u16;
+        let pc = self.pc;
+        self.pc += 2;
+
+        let opcode = u16::from_be_bytes([self.memory[pc], self.memory[pc + 1]]);
         match (
             opcode.bits(12..16),
             opcode.bits(8..12),
@@ -79,15 +82,18 @@ impl Chip8 {
             opcode.bits(0..4),
         ) {
             (0x0, 0x0, 0xe, 0x0) => {
-                debug!("{:03x}: [{:04x}]  clearing the screen", self.pc, opcode);
+                debug!("{:03x}: [{:04x}]  clearing the screen", pc, opcode);
                 self.display.clear_screen()?;
+            }
+            (0x0, 0x0, 0xe, 0xe) => {
+                debug!("{:03x}: [{:04x}]  returning from subroutine", pc, opcode);
+                let address = u16::from_be_bytes([self.memory[self.sp], self.memory[self.sp + 1]]);
+                self.sp -= 2;
+                self.pc = address as usize;
             }
             (0x1, ..) => {
                 let address = opcode.bits(0..12) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  jump to {:03x}h",
-                    self.pc, opcode, address
-                );
+                debug!("{:03x}: [{:04x}]  jump to {:03x}h", pc, opcode, address);
                 self.pc = address;
                 return Ok(());
             }
@@ -95,26 +101,24 @@ impl Chip8 {
                 let address = opcode.bits(0..12) as usize;
                 debug!(
                     "{:03x}: [{:04x}]  call subroutine at {:03x}h",
-                    self.pc, opcode, address
+                    pc, opcode, address
                 );
                 self.sp += 2;
-                let bytes = self.pc.to_be_bytes();
+                let bytes = (self.pc as u16).to_be_bytes();
                 self.memory[self.sp] = bytes[0];
                 self.memory[self.sp + 1] = bytes[1];
                 self.pc = address;
-                return Ok(());
             }
             (0x3, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
                 debug!(
                     "{:03x}: [{:04x}]  skip next instruction if V{:1x} == {:02x}h",
-                    self.pc, opcode, x, value
+                    pc, opcode, x, value
                 );
                 if self.v[x] == value {
-                    trace!("skipping instruction at {:03x}h", self.pc + 2);
-                    self.pc += 4;
-                    return Ok(());
+                    trace!("skipping instruction at {:03x}h", self.pc);
+                    self.pc += 2;
                 }
             }
             (0x4, ..) => {
@@ -122,12 +126,11 @@ impl Chip8 {
                 let value = opcode.bits(0..8) as u8;
                 debug!(
                     "{:03x}: [{:04x}]  skip next instruction if V{:1x} != {:02x}h",
-                    self.pc, opcode, x, value
+                    pc, opcode, x, value
                 );
                 if self.v[x] != value {
-                    trace!("skipping instruction at {:03x}h", self.pc + 2);
-                    self.pc += 4;
-                    return Ok(());
+                    trace!("skipping instruction at {:03x}h", self.pc);
+                    self.pc += 2;
                 }
             }
             (0x6, ..) => {
@@ -135,7 +138,7 @@ impl Chip8 {
                 let value = opcode.bits(0..8) as u8;
                 debug!(
                     "{:03x}: [{:04x}]  assign {:02x}h to V{:1x}",
-                    self.pc, opcode, value, x
+                    pc, opcode, value, x
                 );
                 self.v[x] = value;
             }
@@ -144,7 +147,7 @@ impl Chip8 {
                 let value = opcode.bits(0..8) as u8;
                 debug!(
                     "{:03x}: [{:04x}]  add the value {:02x}h to V{:1x}",
-                    self.pc, opcode, value, x
+                    pc, opcode, value, x
                 );
                 let value = self.v[x] as u16 + value as u16;
                 self.v[x] = (value % 256) as u8;
@@ -154,7 +157,7 @@ impl Chip8 {
                 let y = opcode.bits(4..8) as usize;
                 debug!(
                     "{:03x}: [{:04x}]  assign the value of V{:1x} to V{:1x}",
-                    self.pc, opcode, y, x
+                    pc, opcode, y, x
                 );
                 self.v[x] = self.v[y];
             }
@@ -163,16 +166,13 @@ impl Chip8 {
                 let y = opcode.bits(4..8) as usize;
                 debug!(
                     "{:03x}: [{:04x}]  assign the value of V{:1x} & V{:1x} to V{:1x}",
-                    self.pc, opcode, x, y, x
+                    pc, opcode, x, y, x
                 );
                 self.v[x] = self.v[x] & self.v[y];
             }
             (0xa, ..) => {
                 let address = opcode.bits(0..12) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  assign {:03x}h to I",
-                    self.pc, opcode, address
-                );
+                debug!("{:03x}: [{:04x}]  assign {:03x}h to I", pc, opcode, address);
                 self.i = address;
             }
             (0xc, ..) => {
@@ -180,7 +180,7 @@ impl Chip8 {
                 let mask = opcode.bits(0..8) as u8;
                 debug!(
                     "{:03x}: [{:04x}]  assign a random byte (masked by {:02x}h) to V{:1x}",
-                    self.pc, opcode, mask, x
+                    pc, opcode, mask, x
                 );
                 let byte: u8 = rand::random();
                 self.v[x] = byte & mask;
@@ -191,7 +191,7 @@ impl Chip8 {
                 let n = opcode.bits(0..4) as usize;
                 debug!(
                     "{:03x}: [{:04x}]  draw {} byte sprite to the screen at V{:1x}, V{:1x}",
-                    self.pc, opcode, n, vx, vy
+                    pc, opcode, n, vx, vy
                 );
                 let sprite = &self.memory[self.i..][..n];
                 let x = self.v[vx];
@@ -207,7 +207,7 @@ impl Chip8 {
                 let x = opcode.bits(8..12) as usize;
                 debug!(
                     "{:03x}: [{:04x}]  wait for keypress and assign value to V{:1x}",
-                    self.pc, opcode, x
+                    pc, opcode, x
                 );
                 let value = self.input.wait_for_input();
                 self.v[x] = value;
@@ -216,7 +216,7 @@ impl Chip8 {
                 let x = opcode.bits(8..12) as usize;
                 debug!(
                     "{:03x}: [{:04x}]  assign address of digit in V{:1x} ({}) to I",
-                    self.pc, opcode, x, self.v[x]
+                    pc, opcode, x, self.v[x]
                 );
                 let digit = self.v[x] as usize;
                 self.i = FONT_DATA_START + digit * FONT_DIGIT_SIZE;
@@ -225,7 +225,7 @@ impl Chip8 {
                 let x = opcode.bits(8..12) as usize;
                 debug!(
                     "{:03x}: [{:04x}]  assign BCD of V{:1x} ({:02x}h) to {:03x}h, {:03x}h, {:03x}h",
-                    self.pc,
+                    pc,
                     opcode,
                     x,
                     self.v[x as usize],
@@ -249,7 +249,7 @@ impl Chip8 {
                 let x = opcode.bits(8..12) as usize;
                 debug!(
                     "{:03x}: [{:04x}]  assign values starting at {:03x}h to V0..=V{:1x}",
-                    self.pc, opcode, self.i, x
+                    pc, opcode, self.i, x
                 );
                 for i in 0..=x {
                     let value = self.memory[self.i];
@@ -259,13 +259,11 @@ impl Chip8 {
                 }
             }
             _ => {
-                debug!("{:03x}: [{:04x}]  halting", self.pc, opcode);
+                debug!("{:03x}: [{:04x}]  halting", pc, opcode);
                 self.halted = true;
                 return Ok(());
             }
         }
-
-        self.pc += 2;
 
         Ok(())
     }
