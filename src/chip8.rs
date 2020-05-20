@@ -141,6 +141,15 @@ impl Chip8 {
                 );
                 self.v[x] = self.v[y];
             }
+            (0x8, _, _, 0x2) => {
+                let x = opcode.bits(8..12) as usize;
+                let y = opcode.bits(4..8) as usize;
+                debug!(
+                    "{:03x}: [{:04x}]  assign the value of V{:1x} & V{:1x} to V{:1x}",
+                    self.pc, opcode, x, y, x
+                );
+                self.v[x] = self.v[x] & self.v[y];
+            }
             (0xa, ..) => {
                 let address = opcode.bits(0..12) as usize;
                 debug!(
