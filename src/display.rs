@@ -1,6 +1,6 @@
 use {
     crate::Error,
-    log::trace,
+    log::*,
     sdl2::{pixels::Color, rect::Rect, render::Canvas, video::Window, Sdl},
     std::fmt::{self, Formatter},
 };
@@ -18,6 +18,7 @@ impl Display {
         let (w, h) = (width as usize, height as usize);
         let scale = gui_scale as usize;
 
+        info!(target: "sdl", "creating window at {}x scale ({}x{} pixels)", scale, w * scale, h * scale);
         let video = sdl.video()?;
         let window = video
             .window("CHIP-8", width * gui_scale, height * gui_scale)
@@ -35,6 +36,7 @@ impl Display {
     }
 
     pub fn clear_screen(&mut self) -> Result<(), Error> {
+        debug!(target: "dsp", "clearing screen backing buffer");
         for pixel in self.pixels.iter_mut() {
             *pixel = 0;
         }
@@ -43,11 +45,40 @@ impl Display {
     }
 
     pub fn draw_sprite(&mut self, sprite: &[u8], x: u8, y: u8) -> Result<bool, Error> {
+        debug!(target: "dsp", "drawing sprite to backing buffer");
+        if log_enabled!(target: "dsp", Level::Trace) {
+            let mut chunks = sprite.chunks_exact(2);
+            while let Some(&[one, two]) = chunks.next() {
+                let mut one = one.reverse_bits();
+                let mut two = two.reverse_bits();
+                for _ in 0..8 {
+                    match (one & 1 != 0, two & 1 != 0) {
+                        (false, false) => print!(" "),
+                        (false, true) => print!("▄"),
+                        (true, false) => print!("▀"),
+                        (true, true) => print!("█"),
+                    }
+                    one >>= 1;
+                    two >>= 1;
+                }
+                println!("│");
+            }
+            for byte in chunks.remainder() {
+                let mut byte = byte.reverse_bits();
+                for _ in 0..8 {
+                    match byte & 1 != 0 {
+                        false => print!(" "),
+                        true => print!("▀"),
+                    }
+                    byte >>= 1;
+                }
+                println!("│");
+            }
+        }
+
         let x = x as usize;
         let y = y as usize;
         let mut toggled_off = false;
-
-        trace!("drawing sprite {:?}", sprite);
 
         for dy in 0..sprite.len() {
             let mut byte = sprite[dy].reverse_bits();
@@ -71,9 +102,11 @@ impl Display {
     }
 
     pub fn present(&mut self) -> Result<(), String> {
+        debug!(target: "sdl", "updating canvas");
         let scale = self.scale as f32;
         self.canvas.set_scale(scale, scale)?;
 
+        trace!(target: "sdl", "clearing canvas");
         self.canvas.set_draw_color(Color::BLACK);
         self.canvas.clear();
 
@@ -82,12 +115,14 @@ impl Display {
             for x in 0..self.w {
                 let index = y * self.w + x;
                 if self.pixels[index] != 0 {
+                    trace!(target: "sdl", "drawing pixel ({}, {})", x, y);
                     let pixel = Rect::new(x as i32, y as i32, 1, 1);
                     self.canvas.fill_rect(pixel)?;
                 }
             }
         }
 
+        debug!(target: "sdl", "presenting canvas");
         self.canvas.present();
 
         Ok(())

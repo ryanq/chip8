@@ -1,6 +1,6 @@
 use {
     crate::Error,
-    log::trace,
+    log::*,
     sdl2::{event::Event, keyboard::Keycode, EventPump, Sdl},
     std::{thread, time::Duration},
 };
@@ -14,6 +14,7 @@ pub struct Input {
 
 impl Input {
     pub fn new(sdl: &Sdl) -> Result<Input, Error> {
+        info!(target: "sdl", "creating event pump");
         let events = sdl.event_pump()?;
 
         Ok(Input {
@@ -25,9 +26,10 @@ impl Input {
     }
 
     pub fn handle_input(&mut self) {
+        debug!(target: "inp", "processing pending input");
         let events = self.events.poll_iter().collect::<Vec<_>>();
         for event in events {
-            trace!("processing event {:?}", event);
+            trace!(target: "evt", "processing event {:?}", event);
             match event {
                 Event::Quit { .. } => {
                     self.quit = true;
@@ -199,6 +201,7 @@ impl Input {
     }
 
     pub fn wait_for_input(&mut self) -> u8 {
+        debug!(target: "inp", "waiting for next input");
         self.last_key = None;
 
         while self.last_key.is_none() {

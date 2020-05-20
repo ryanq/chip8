@@ -1,6 +1,6 @@
 use {
     crate::{display::Display, input::Input, Error},
-    log::{debug, trace},
+    log::*,
     quark::BitIndex,
     std::thread,
     std::time::Duration,
@@ -48,10 +48,12 @@ impl Chip8 {
     }
 
     pub fn run(&mut self) -> Result<(), Error> {
+        info!(target: "exe", "starting run loop");
         self.display.present()?;
         loop {
             self.input.handle_input();
             if self.input.quit {
+                info!(target: "exe", "quit requested; halting");
                 break;
             }
 
@@ -82,27 +84,24 @@ impl Chip8 {
             opcode.bits(0..4),
         ) {
             (0x0, 0x0, 0xe, 0x0) => {
-                debug!("{:03x}: [{:04x}]  clearing the screen", pc, opcode);
+                debug!(target: "asm", "{:03x}: [{:04x}] cls", pc, opcode);
                 self.display.clear_screen()?;
             }
             (0x0, 0x0, 0xe, 0xe) => {
-                debug!("{:03x}: [{:04x}]  returning from subroutine", pc, opcode);
+                debug!(target: "asm", "{:03x}: [{:04x}] ret", pc, opcode);
                 let address = u16::from_be_bytes([self.memory[self.sp], self.memory[self.sp + 1]]);
                 self.sp -= 2;
                 self.pc = address as usize;
             }
             (0x1, ..) => {
                 let address = opcode.bits(0..12) as usize;
-                debug!("{:03x}: [{:04x}]  jump to {:03x}h", pc, opcode, address);
+                debug!(target: "asm", "{:03x}: [{:04x}] jp {:03x}", pc, opcode, address);
                 self.pc = address;
                 return Ok(());
             }
             (0x2, ..) => {
                 let address = opcode.bits(0..12) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  call subroutine at {:03x}h",
-                    pc, opcode, address
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] call {:03x}", pc, opcode, address);
                 self.sp += 2;
                 let bytes = (self.pc as u16).to_be_bytes();
                 self.memory[self.sp] = bytes[0];
@@ -112,76 +111,53 @@ impl Chip8 {
             (0x3, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
-                debug!(
-                    "{:03x}: [{:04x}]  skip next instruction if V{:1x} == {:02x}h",
-                    pc, opcode, x, value
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] se v{:1x}, {:02x}", pc, opcode, x, value);
                 if self.v[x] == value {
-                    trace!("skipping instruction at {:03x}h", self.pc);
                     self.pc += 2;
                 }
             }
             (0x4, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
-                debug!(
-                    "{:03x}: [{:04x}]  skip next instruction if V{:1x} != {:02x}h",
-                    pc, opcode, x, value
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] sne v{:1x}, {:02x}", pc, opcode, x, value);
                 if self.v[x] != value {
-                    trace!("skipping instruction at {:03x}h", self.pc);
                     self.pc += 2;
                 }
             }
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
-                debug!(
-                    "{:03x}: [{:04x}]  assign {:02x}h to V{:1x}",
-                    pc, opcode, value, x
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, {:02x}", pc, opcode, x, value);
                 self.v[x] = value;
             }
             (0x7, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
-                debug!(
-                    "{:03x}: [{:04x}]  add the value {:02x}h to V{:1x}",
-                    pc, opcode, value, x
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] add v{:1x}, {:02x}", pc, opcode, x, value);
                 let value = self.v[x] as u16 + value as u16;
                 self.v[x] = (value % 256) as u8;
             }
             (0x8, _, _, 0x0) => {
                 let x = opcode.bits(8..12) as usize;
                 let y = opcode.bits(4..8) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  assign the value of V{:1x} to V{:1x}",
-                    pc, opcode, y, x
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, v{:1x}", pc, opcode, x, y);
                 self.v[x] = self.v[y];
             }
             (0x8, _, _, 0x2) => {
                 let x = opcode.bits(8..12) as usize;
                 let y = opcode.bits(4..8) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  assign the value of V{:1x} & V{:1x} to V{:1x}",
-                    pc, opcode, x, y, x
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] and v{:1x}, v{:1x}", pc, opcode, x, y);
                 self.v[x] = self.v[x] & self.v[y];
             }
             (0xa, ..) => {
                 let address = opcode.bits(0..12) as usize;
-                debug!("{:03x}: [{:04x}]  assign {:03x}h to I", pc, opcode, address);
+                debug!(target: "asm", "{:03x}: [{:04x}] ld i, {:03x}", pc, opcode, address);
                 self.i = address;
             }
             (0xc, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let mask = opcode.bits(0..8) as u8;
-                debug!(
-                    "{:03x}: [{:04x}]  assign a random byte (masked by {:02x}h) to V{:1x}",
-                    pc, opcode, mask, x
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] rnd v{:1x}, {:02x}", pc, opcode, x, mask);
                 let byte: u8 = rand::random();
                 self.v[x] = byte & mask;
             }
@@ -189,10 +165,7 @@ impl Chip8 {
                 let vx = opcode.bits(8..12) as usize;
                 let vy = opcode.bits(4..8) as usize;
                 let n = opcode.bits(0..4) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  draw {} byte sprite to the screen at V{:1x}, V{:1x}",
-                    pc, opcode, n, vx, vy
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] drw v{:1x}, v{:1x}, {:1x}", pc, opcode, vx, vy, n);
                 let sprite = &self.memory[self.i..][..n];
                 let x = self.v[vx];
                 let y = self.v[vy];
@@ -205,34 +178,19 @@ impl Chip8 {
             }
             (0xf, _, 0x0, 0xa) => {
                 let x = opcode.bits(8..12) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  wait for keypress and assign value to V{:1x}",
-                    pc, opcode, x
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, k", pc, opcode, x);
                 let value = self.input.wait_for_input();
                 self.v[x] = value;
             }
             (0xf, _, 0x2, 0x9) => {
                 let x = opcode.bits(8..12) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  assign address of digit in V{:1x} ({}) to I",
-                    pc, opcode, x, self.v[x]
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] ld f, v{:1x}", pc, opcode, x);
                 let digit = self.v[x] as usize;
                 self.i = FONT_DATA_START + digit * FONT_DIGIT_SIZE;
             }
             (0xf, _, 0x3, 0x3) => {
                 let x = opcode.bits(8..12) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  assign BCD of V{:1x} ({:02x}h) to {:03x}h, {:03x}h, {:03x}h",
-                    pc,
-                    opcode,
-                    x,
-                    self.v[x as usize],
-                    self.i,
-                    self.i + 1,
-                    self.i + 2
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] ld b, v{:1x}", pc, opcode, x);
                 let mut value = self.v[x as usize];
                 let ones = value % 10;
                 value /= 10;
@@ -240,26 +198,21 @@ impl Chip8 {
                 value /= 10;
                 let hundreds = value;
 
-                trace!("digits: {}, {}, {}", hundreds, tens, ones);
                 self.memory[self.i] = hundreds;
                 self.memory[self.i + 1] = tens;
                 self.memory[self.i + 2] = ones;
             }
             (0xf, _, 0x6, 0x5) => {
                 let x = opcode.bits(8..12) as usize;
-                debug!(
-                    "{:03x}: [{:04x}]  assign values starting at {:03x}h to V0..=V{:1x}",
-                    pc, opcode, self.i, x
-                );
+                debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, [i]", pc, opcode, x);
                 for i in 0..=x {
                     let value = self.memory[self.i];
-                    trace!("assigning {} (from {:03x}h) to V{}", value, self.i, i);
                     self.v[i] = value;
                     self.i += 1;
                 }
             }
             _ => {
-                debug!("{:03x}: [{:04x}]  halting", pc, opcode);
+                error!(target: "asm", "{:03x}: [{:04x}] unknown instruction", pc, opcode);
                 self.halted = true;
                 return Ok(());
             }

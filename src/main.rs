@@ -5,7 +5,7 @@ mod input;
 
 use {
     chip8::Chip8,
-    log::info,
+    log::*,
     std::{
         error,
         fmt::{self, Formatter},
@@ -24,10 +24,10 @@ fn main() -> Result<(), Error> {
         //         before reaching this block if the program parameter is left
         //         unspecified.
         let path = args.value_of(cli::PROGRAM).unwrap();
-        info!("reading program from {}", path);
         let mut file = File::open(path)?;
         let mut buffer = Vec::with_capacity(0x1000);
-        file.read_to_end(&mut buffer)?;
+        let size = file.read_to_end(&mut buffer)?;
+        info!(target: "cli", "read {} bytes from {}", size, path);
 
         buffer
     };
