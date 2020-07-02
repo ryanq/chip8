@@ -17,6 +17,7 @@ pub struct Chip8 {
     pc: usize,
     sp: usize,
     at: u8,
+    dt: u8,
     memory: Vec<u8>,
     audio: Audio,
     display: Display,
@@ -44,6 +45,7 @@ impl Chip8 {
             pc: PROGRAM_START,
             sp: STACK_START,
             at: 0,
+            dt: 0,
             memory,
             audio,
             display,
@@ -193,6 +195,11 @@ impl Chip8 {
                 let value = self.input.wait_for_input();
                 self.v[x] = value;
             }
+            (0xf, _, 0x1, 0x5) => {
+                let x = opcode.bits(8..12) as usize;
+                debug!(target: "asm", "{:03x}: [{:04x}] ld dt, v{:1x}", pc, opcode, x);
+                self.dt = self.v[x];
+            }
             (0xf, _, 0x1, 0x8) => {
                 let x = opcode.bits(8..12) as usize;
                 debug!(target: "asm", "{:03x}: [{:04x}] ld st, v{:1x}", pc, opcode, x);
@@ -240,6 +247,10 @@ impl Chip8 {
     fn update_timers(&mut self) {
         if self.at > 0 {
             self.at -= 1;
+        }
+
+        if self.dt > 0 {
+            self.dt -= 1;
         }
     }
 }
