@@ -109,7 +109,8 @@ impl Chip8 {
             (0x0, ..) => {
                 let address = opcode.bits(0..12);
                 error!(target: "asm", "{:03x}: [{:04x}] sys {:03x}", pc, opcode, address);
-                panic!("The sys instruction is not implemented");
+                self.halted = true;
+                return Ok(());
             }
             (0x1, ..) => {
                 let address = opcode.bits(0..12) as usize;
