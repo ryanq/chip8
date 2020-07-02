@@ -51,7 +51,7 @@ impl Chip8 {
         info!(target: "exe", "starting run loop");
         self.display.present()?;
         loop {
-            self.input.handle_input();
+            self.input.process_pending_input();
             if self.input.quit {
                 info!(target: "exe", "quit requested; halting");
                 break;
