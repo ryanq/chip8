@@ -189,6 +189,11 @@ impl Chip8 {
                     self.v[15] = 0;
                 }
             }
+            (0xf, _, 0x0, 0x7) => {
+                let x = opcode.bits(8..12) as usize;
+                debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, dt", pc, opcode, x);
+                self.v[x] = self.dt;
+            }
             (0xf, _, 0x0, 0xa) => {
                 let x = opcode.bits(8..12) as usize;
                 debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, k", pc, opcode, x);
