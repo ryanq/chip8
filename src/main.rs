@@ -1,3 +1,4 @@
+mod audio;
 mod chip8;
 mod cli;
 mod display;

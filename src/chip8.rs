@@ -1,5 +1,5 @@
 use {
-    crate::{display::Display, input::Input, Error},
+    crate::{audio::Audio, display::Display, input::Input, Error},
     log::*,
     quark::BitIndex,
     std::thread,
@@ -16,7 +16,9 @@ pub struct Chip8 {
     i: usize,
     pc: usize,
     sp: usize,
+    at: u8,
     memory: Vec<u8>,
+    audio: Audio,
     display: Display,
     input: Input,
     halted: bool,
@@ -28,6 +30,7 @@ impl Chip8 {
     pub fn new(program: &[u8], gui_scale: u32, keymap: &str) -> Result<Chip8, Error> {
         let sdl = sdl2::init()?;
 
+        let audio = Audio::new(&sdl)?;
         let display = Display::new(&sdl, gui_scale, SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS)?;
         let input = Input::new(&sdl, keymap)?;
 
@@ -40,7 +43,9 @@ impl Chip8 {
             i: 0,
             pc: PROGRAM_START,
             sp: STACK_START,
+            at: 0,
             memory,
+            audio,
             display,
             input,
             halted: false,
@@ -58,7 +63,13 @@ impl Chip8 {
             }
 
             self.step()?;
+            self.update_timers();
             self.display.present()?;
+            if self.at == 0 {
+                self.audio.stop();
+            } else {
+                self.audio.start();
+            }
 
             thread::sleep(CYCLE_RATE);
         }
@@ -182,6 +193,11 @@ impl Chip8 {
                 let value = self.input.wait_for_input();
                 self.v[x] = value;
             }
+            (0xf, _, 0x1, 0x8) => {
+                let x = opcode.bits(8..12) as usize;
+                debug!(target: "asm", "{:03x}: [{:04x}] ld st, v{:1x}", pc, opcode, x);
+                self.at = self.v[x];
+            }
             (0xf, _, 0x2, 0x9) => {
                 let x = opcode.bits(8..12) as usize;
                 debug!(target: "asm", "{:03x}: [{:04x}] ld f, v{:1x}", pc, opcode, x);
@@ -219,6 +235,12 @@ impl Chip8 {
         }
 
         Ok(())
+    }
+
+    fn update_timers(&mut self) {
+        if self.at > 0 {
+            self.at -= 1;
+        }
     }
 }
 
