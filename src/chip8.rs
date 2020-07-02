@@ -25,7 +25,8 @@ pub struct Chip8 {
     halted: bool,
 }
 
-const CYCLE_RATE: Duration = Duration::from_nanos(1_000_000 / 60);
+const CYCLES_PER_SECOND: u64 = 60;
+const CYCLE_RATE: Duration = Duration::from_nanos(1_000_000_000 / CYCLES_PER_SECOND);
 
 impl Chip8 {
     pub fn new(program: &[u8], gui_scale: u32, keymap: &str) -> Result<Chip8, Error> {
@@ -65,8 +66,13 @@ impl Chip8 {
             }
 
             self.step()?;
+
             self.update_timers();
-            self.display.present()?;
+
+            if self.display.needs_presenting() {
+                self.display.present()?;
+            }
+
             if self.at == 0 {
                 self.audio.stop();
             } else {

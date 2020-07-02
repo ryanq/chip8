@@ -11,6 +11,7 @@ pub struct Display {
     scale: usize,
     pixels: Vec<u8>,
     canvas: Canvas<Window>,
+    dirty: bool,
 }
 
 impl Display {
@@ -32,7 +33,12 @@ impl Display {
             scale,
             pixels: vec![0; w * h],
             canvas,
+            dirty: true,
         })
+    }
+
+    pub fn needs_presenting(&self) -> bool {
+        self.dirty
     }
 
     pub fn clear_screen(&mut self) -> Result<(), Error> {
@@ -41,6 +47,7 @@ impl Display {
             *pixel = 0;
         }
 
+        self.dirty = true;
         Ok(())
     }
 
@@ -98,6 +105,7 @@ impl Display {
             }
         }
 
+        self.dirty = true;
         Ok(toggled_off)
     }
 
@@ -125,6 +133,7 @@ impl Display {
         debug!(target: "sdl", "presenting canvas");
         self.canvas.present();
 
+        self.dirty = false;
         Ok(())
     }
 }
