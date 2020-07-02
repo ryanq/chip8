@@ -97,6 +97,10 @@ impl Input {
         //         field is not None.
         self.last_key.unwrap()
     }
+
+    pub fn is_key_pressed(&self, key: u8) -> bool {
+        self.key_status[key as usize]
+    }
 }
 
 impl Input {
