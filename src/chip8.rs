@@ -1,15 +1,15 @@
 use {
-    crate::{audio::Audio, display::Display, input::Input, Error},
+    crate::{audio::Audio, cli::*, display::Display, input::Input, Error},
     log::*,
     quark::BitIndex,
+    std::fs::File,
+    std::io::Read,
     std::thread,
     std::time::Duration,
 };
 
 const PROGRAM_START: usize = 0x200;
 const STACK_START: usize = PROGRAM_START - 32;
-pub const SCREEN_WIDTH_PIXELS: u32 = 64;
-pub const SCREEN_HEIGHT_PIXELS: u32 = 32;
 
 pub struct Chip8 {
     v: [u8; 16],
@@ -29,16 +29,25 @@ const CYCLES_PER_SECOND: u64 = 120;
 const CYCLE_RATE: Duration = Duration::from_nanos(1_000_000_000 / CYCLES_PER_SECOND);
 
 impl Chip8 {
-    pub fn new(program: &[u8], gui_scale: u32, keymap: &str) -> Result<Chip8, Error> {
+    pub fn new(config: &Config) -> Result<Chip8, Error> {
         let sdl = sdl2::init()?;
 
         let audio = Audio::new(&sdl)?;
-        let display = Display::new(&sdl, gui_scale, SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS)?;
-        let input = Input::new(&sdl, keymap)?;
+        let display = Display::new(&sdl, &config)?;
+        let input = Input::new(&sdl, &config)?;
 
         let mut memory = vec![0; 0x1000];
         memory[0..][..FONT_DATA.len()].copy_from_slice(FONT_DATA);
-        memory[PROGRAM_START..][..program.len()].copy_from_slice(program);
+
+        let program = {
+            let mut file = File::open(&config.program)?;
+            let mut buffer = Vec::with_capacity(0x1000);
+            let size = file.read_to_end(&mut buffer)?;
+            info!(target: "cli", "read {} bytes from {}", size, config.program.display());
+
+            buffer
+        };
+        memory[PROGRAM_START..][..program.len()].copy_from_slice(&program);
 
         Ok(Chip8 {
             v: [0; 16],

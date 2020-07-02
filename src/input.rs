@@ -1,5 +1,5 @@
 use {
-    crate::Error,
+    crate::{cli::{Config, Keymap}, Error},
     log::*,
     sdl2::{event::Event, keyboard::{Keycode, Mod}, EventPump, Sdl},
     std::{collections::HashMap, thread, time::Duration},
@@ -14,14 +14,13 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new(sdl: &Sdl, keymap: &str) -> Result<Input, Error> {
+    pub fn new(sdl: &Sdl, config: &Config) -> Result<Input, Error> {
         info!(target: "sdl", "creating event pump");
         let events = sdl.event_pump()?;
 
-        let key_map = match keymap {
-            "qwerty" | "QWERTY" => QWERTY_KEY_MAP,
-            "colemak" | "COLEMAK" => COLEMAK_KEY_MAP,
-            _ => return Err(Error::S("unknown key mapping".into()))
+        let key_map = match config.keymap {
+            Keymap::Qwerty => QWERTY_KEY_MAP,
+            Keymap::Colemak => COLEMAK_KEY_MAP,
         }.iter()
          .cloned()
          .collect::<HashMap<_, _>>();
@@ -114,10 +113,10 @@ impl Input {
     }
 }
 
-pub type KeyMap = [(Keycode, u8)];
+type KeyMapping = [(Keycode, u8)];
 
 #[allow(dead_code)]
-pub static QWERTY_KEY_MAP: &KeyMap = &[
+pub static QWERTY_KEY_MAP: &KeyMapping = &[
     (Keycode::Num1, 0x1),
     (Keycode::Num2, 0x2),
     (Keycode::Num3, 0x3),
@@ -137,7 +136,7 @@ pub static QWERTY_KEY_MAP: &KeyMap = &[
 ];
 
 #[allow(dead_code)]
-pub static COLEMAK_KEY_MAP: &KeyMap = &[
+pub static COLEMAK_KEY_MAP: &KeyMapping = &[
     (Keycode::Num1, 0x1),
     (Keycode::Num2, 0x2),
     (Keycode::Num3, 0x3),

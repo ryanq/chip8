@@ -1,9 +1,12 @@
 use {
-    crate::Error,
+    crate::{cli::{Config, Size}, Error},
     log::*,
     sdl2::{pixels::Color, rect::Rect, render::Canvas, video::Window, Sdl},
     std::fmt::{self, Formatter},
 };
+
+const SCREEN_WIDTH_PIXELS: usize = 64;
+const SCREEN_HEIGHT_PIXELS: usize = 32;
 
 pub struct Display {
     w: usize,
@@ -15,23 +18,29 @@ pub struct Display {
 }
 
 impl Display {
-    pub fn new(sdl: &Sdl, gui_scale: u32, width: u32, height: u32) -> Result<Display, Error> {
-        let (w, h) = (width as usize, height as usize);
-        let scale = gui_scale as usize;
+    pub fn new(sdl: &Sdl, config: &Config) -> Result<Display, Error> {
+        let scale = match config.size {
+            Size::Small => 4,
+            Size::Normal => 8,
+            Size::Large => 16,
+        };
 
-        info!(target: "sdl", "creating window at {}x scale ({}x{} pixels)", scale, w * scale, h * scale);
+        let width = SCREEN_WIDTH_PIXELS * scale;
+        let height = SCREEN_HEIGHT_PIXELS * scale;
+
+        info!(target: "sdl", "creating window at {}x scale ({}x{} pixels)", scale, width, height);
         let video = sdl.video()?;
         let window = video
-            .window("CHIP-8", width * gui_scale, height * gui_scale)
+            .window("CHIP-8", width as u32, height as u32)
             .position_centered()
             .build()?;
         let canvas = window.into_canvas().build()?;
 
         Ok(Display {
-            w,
-            h,
+            w: SCREEN_WIDTH_PIXELS,
+            h: SCREEN_HEIGHT_PIXELS,
             scale,
-            pixels: vec![0; w * h],
+            pixels: vec![0; SCREEN_WIDTH_PIXELS * SCREEN_HEIGHT_PIXELS],
             canvas,
             dirty: true,
         })

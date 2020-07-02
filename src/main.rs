@@ -6,46 +6,17 @@ mod input;
 
 use {
     chip8::Chip8,
-    log::*,
-    std::{
-        error,
-        fmt::{self, Formatter},
-        fs::File,
-        io::{self, Read},
-    },
+    clap::Clap,
+    cli::Config,
+    std::{error, fmt::{self, Formatter}, io},
 };
 
 fn main() -> Result<(), Error> {
-    let args = cli::process_arguments();
-    let log_level = cli::log_level(args.occurrences_of(cli::VERBOSE));
-    cli::configure_logging(log_level);
+    cli::configure_logging();
 
-    let program = {
-        // SAFETY: The 'program' argument is required, so execution will end
-        //         before reaching this block if the program parameter is left
-        //         unspecified.
-        let path = args.value_of(cli::PROGRAM).unwrap();
-        let mut file = File::open(path)?;
-        let mut buffer = Vec::with_capacity(0x1000);
-        let size = file.read_to_end(&mut buffer)?;
-        info!(target: "cli", "read {} bytes from {}", size, path);
+    let config = Config::parse();
 
-        buffer
-    };
-
-    let gui_scale = if args.occurrences_of(cli::SMALL) != 0 {
-        4
-    } else if args.occurrences_of(cli::LARGE) != 0 {
-        16
-    } else {
-        8
-    };
-
-    // SAFETY: The 'keymap' argument has a default value, so a value will always
-    //         be present.
-    let keymap = args.value_of(cli::KEYMAP).unwrap();
-
-    let mut c8 = Chip8::new(&program, gui_scale, keymap)?;
+    let mut c8 = Chip8::new(&config)?;
     c8.run()?;
 
     Ok(())
