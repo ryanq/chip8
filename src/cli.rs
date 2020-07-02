@@ -7,6 +7,7 @@ use {
 pub const VERBOSE: &'static str = "verbose";
 pub const SMALL: &'static str = "small";
 pub const LARGE: &'static str = "large";
+pub const KEYMAP: &'static str = "keymap";
 pub const PROGRAM: &'static str = "program";
 
 pub fn process_arguments<'a>() -> ArgMatches<'a> {
@@ -36,6 +37,15 @@ pub fn process_arguments<'a>() -> ArgMatches<'a> {
                 .long("large")
                 .takes_value(false)
                 .help("Render the UI larger"),
+        )
+        .arg(
+            Arg::with_name(KEYMAP)
+                .short("k")
+                .long("keymap")
+                .takes_value(true)
+                .possible_values(&["qwerty", "colemak"])
+                .default_value("qwerty")
+                .help("Switch key mapping"),
         )
         .arg(
             Arg::with_name(PROGRAM)

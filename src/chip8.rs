@@ -25,11 +25,11 @@ pub struct Chip8 {
 const CYCLE_RATE: Duration = Duration::from_nanos(1_000_000 / 60);
 
 impl Chip8 {
-    pub fn new(program: &[u8], gui_scale: u32) -> Result<Chip8, Error> {
+    pub fn new(program: &[u8], gui_scale: u32, keymap: &str) -> Result<Chip8, Error> {
         let sdl = sdl2::init()?;
 
         let display = Display::new(&sdl, gui_scale, SCREEN_WIDTH_PIXELS, SCREEN_HEIGHT_PIXELS)?;
-        let input = Input::new(&sdl)?;
+        let input = Input::new(&sdl, keymap)?;
 
         let mut memory = vec![0; 0x1000];
         memory[0..][..FONT_DATA.len()].copy_from_slice(FONT_DATA);

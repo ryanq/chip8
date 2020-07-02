@@ -40,7 +40,11 @@ fn main() -> Result<(), Error> {
         8
     };
 
-    let mut c8 = Chip8::new(&program, gui_scale)?;
+    // SAFETY: The 'keymap' argument has a default value, so a value will always
+    //         be present.
+    let keymap = args.value_of(cli::KEYMAP).unwrap();
+
+    let mut c8 = Chip8::new(&program, gui_scale, keymap)?;
     c8.run()?;
 
     Ok(())

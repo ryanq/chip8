@@ -14,13 +14,17 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new(sdl: &Sdl) -> Result<Input, Error> {
+    pub fn new(sdl: &Sdl, keymap: &str) -> Result<Input, Error> {
         info!(target: "sdl", "creating event pump");
         let events = sdl.event_pump()?;
 
-        let key_map = COLEMAK_KEY_MAP.iter()
-                                     .cloned()
-                                     .collect::<HashMap<_, _>>();
+        let key_map = match keymap {
+            "qwerty" | "QWERTY" => QWERTY_KEY_MAP,
+            "colemak" | "COLEMAK" => COLEMAK_KEY_MAP,
+            _ => return Err(Error::S("unknown key mapping".into()))
+        }.iter()
+         .cloned()
+         .collect::<HashMap<_, _>>();
         debug!(target: "inp", "key map: {:?}", key_map);
 
         Ok(Input {
@@ -106,8 +110,10 @@ impl Input {
     }
 }
 
+pub type KeyMap = [(Keycode, u8)];
+
 #[allow(dead_code)]
-static QWERTY_KEY_MAP: &[(Keycode, u8)] = &[
+pub static QWERTY_KEY_MAP: &KeyMap = &[
     (Keycode::Num1, 0x1),
     (Keycode::Num2, 0x2),
     (Keycode::Num3, 0x3),
@@ -127,7 +133,7 @@ static QWERTY_KEY_MAP: &[(Keycode, u8)] = &[
 ];
 
 #[allow(dead_code)]
-static COLEMAK_KEY_MAP: &[(Keycode, u8)] = &[
+pub static COLEMAK_KEY_MAP: &KeyMap = &[
     (Keycode::Num1, 0x1),
     (Keycode::Num2, 0x2),
     (Keycode::Num3, 0x3),
