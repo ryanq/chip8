@@ -188,8 +188,22 @@ impl Chip8 {
                 debug!(target: "asm", "{:03x}: [{:04x}] xor v{:1x}, v{:1x}", pc, opcode, x, y);
                 self.v[x] = self.v[x] ^ self.v[y];
             }
-            // (0x8, _, _, 0x4)
-            // (0x8, _, _, 0x5)
+            (0x8, _, _, 0x4) => {
+                let x = opcode.bits(8..12) as usize;
+                let y = opcode.bits(4..8) as usize;
+                debug!(target: "asm", "{:03x}: [{:04x}] add v{:1x}, v{:1x}", pc, opcode, x, y);
+                let (value, overflow) = self.v[x].overflowing_add(self.v[y]);
+                self.v[x] = value;
+                self.v[15] = if overflow { 1 } else { 0 };
+            }
+            (0x8, _, _, 0x5) => {
+                let x = opcode.bits(8..12) as usize;
+                let y = opcode.bits(4..8) as usize;
+                debug!(target: "asm", "{:03x}: [{:04x}] sub v{:1x}, v{:1x}", pc, opcode, x, y);
+                let (value, borrow) = self.v[x].overflowing_sub(self.v[y]);
+                self.v[x] = value;
+                self.v[15] = if !borrow { 1 } else { 0 };
+            }
             (0x8, _, _, 0x6) => {
                 let x = opcode.bits(8..12) as usize;
                 let y = opcode.bits(4..8) as usize;
@@ -197,7 +211,14 @@ impl Chip8 {
                 self.v[15] = self.v[x] & 1;
                 self.v[x] >>= 1;
             }
-            // (0x8, _, _, 0x7)
+            (0x8, _, _, 0x7) => {
+                let x = opcode.bits(8..12) as usize;
+                let y = opcode.bits(4..8) as usize;
+                debug!(target: "asm", "{:03x}: [{:04x}] subn v{:1x}, v{:1x}", pc, opcode, x, y);
+                let (value, borrow) = self.v[y].overflowing_sub(self.v[x]);
+                self.v[x] = value;
+                self.v[15] = if !borrow { 1 } else { 0 };
+            }
             (0x8, _, _, 0xe) => {
                 let x = opcode.bits(8..12) as usize;
                 let y = opcode.bits(4..8) as usize;
