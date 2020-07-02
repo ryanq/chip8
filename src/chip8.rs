@@ -25,7 +25,7 @@ pub struct Chip8 {
     halted: bool,
 }
 
-const CYCLES_PER_SECOND: u64 = 60;
+const CYCLES_PER_SECOND: u64 = 120;
 const CYCLE_RATE: Duration = Duration::from_nanos(1_000_000_000 / CYCLES_PER_SECOND);
 
 impl Chip8 {
