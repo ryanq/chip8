@@ -96,6 +96,7 @@ impl Chip8 {
             opcode.bits(4..8),
             opcode.bits(0..4),
         ) {
+            // (0x0, ..) // SYS <addr> - unimplemented
             (0x0, 0x0, 0xe, 0x0) => {
                 debug!(target: "asm", "{:03x}: [{:04x}] cls", pc, opcode);
                 self.display.clear_screen()?;
@@ -137,6 +138,7 @@ impl Chip8 {
                     self.pc += 2;
                 }
             }
+            // (0x5, ..)
             (0x6, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let value = opcode.bits(0..8) as u8;
@@ -156,17 +158,26 @@ impl Chip8 {
                 debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, v{:1x}", pc, opcode, x, y);
                 self.v[x] = self.v[y];
             }
+            // (0x8, _, _, 0x1)
             (0x8, _, _, 0x2) => {
                 let x = opcode.bits(8..12) as usize;
                 let y = opcode.bits(4..8) as usize;
                 debug!(target: "asm", "{:03x}: [{:04x}] and v{:1x}, v{:1x}", pc, opcode, x, y);
                 self.v[x] = self.v[x] & self.v[y];
             }
+            // (0x8, _, _, 0x3)
+            // (0x8, _, _, 0x4)
+            // (0x8, _, _, 0x5)
+            // (0x8, _, _, 0x6)
+            // (0x8, _, _, 0x7)
+            // (0x8, _, _, 0xe)
+            // (0x9, _, _, 0x0)
             (0xa, ..) => {
                 let address = opcode.bits(0..12) as usize;
                 debug!(target: "asm", "{:03x}: [{:04x}] ld i, {:03x}", pc, opcode, address);
                 self.i = address;
             }
+            // (0xb, ..)
             (0xc, ..) => {
                 let x = opcode.bits(8..12) as usize;
                 let mask = opcode.bits(0..8) as u8;
@@ -189,6 +200,8 @@ impl Chip8 {
                     self.v[15] = 0;
                 }
             }
+            // (0xe, _, 0x9, 0xe)
+            // (0xe, _, 0xa, 0x1)
             (0xf, _, 0x0, 0x7) => {
                 let x = opcode.bits(8..12) as usize;
                 debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, dt", pc, opcode, x);
@@ -210,6 +223,7 @@ impl Chip8 {
                 debug!(target: "asm", "{:03x}: [{:04x}] ld st, v{:1x}", pc, opcode, x);
                 self.at = self.v[x];
             }
+            // (0xf, _, 0x1, 0xe)
             (0xf, _, 0x2, 0x9) => {
                 let x = opcode.bits(8..12) as usize;
                 debug!(target: "asm", "{:03x}: [{:04x}] ld f, v{:1x}", pc, opcode, x);
@@ -230,6 +244,7 @@ impl Chip8 {
                 self.memory[self.i + 1] = tens;
                 self.memory[self.i + 2] = ones;
             }
+            // (0xf, _, 0x5, 0x5)
             (0xf, _, 0x6, 0x5) => {
                 let x = opcode.bits(8..12) as usize;
                 debug!(target: "asm", "{:03x}: [{:04x}] ld v{:1x}, [i]", pc, opcode, x);
