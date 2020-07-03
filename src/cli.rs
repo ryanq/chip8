@@ -33,20 +33,6 @@ pub enum Size {
     Large,
 }
 
-// pub fn process_arguments<'a>() -> ArgMatches<'a> {
-//     App::new("chip8")
-//         .version("1.0")
-//         .author(crate_authors!())
-//         .about("A Chip-8 VM that implements the original standard")
-//         .arg(
-//             Arg::with_name(PROGRAM)
-//                 .value_name("PROGRAM")
-//                 .required(true)
-//                 .help("The path to a Chip-8 program binary"),
-//         )
-//         .get_matches()
-// }
-
 pub fn configure_logging() {
     env_logger::builder()
         .format(|f, record| writeln!(f, "{:>5}: {}", record.level(), record.args()))
