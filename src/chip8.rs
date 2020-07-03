@@ -22,6 +22,7 @@ pub struct Chip8 {
     audio: Audio,
     display: Display,
     input: Input,
+    cycles: u64,
     halted: bool,
 }
 
@@ -60,6 +61,7 @@ impl Chip8 {
             audio,
             display,
             input,
+            cycles: 0,
             halted: false,
         })
     }
@@ -75,6 +77,7 @@ impl Chip8 {
             }
 
             self.step()?;
+            self.cycles += 1;
 
             self.update_timers();
 
@@ -371,6 +374,11 @@ impl Chip8 {
     }
 
     fn update_timers(&mut self) {
+        if self.cycles < CYCLES_PER_SECOND / 60 {
+            return;
+        }
+        self.cycles = 0;
+
         if self.at > 0 {
             self.at -= 1;
         }
