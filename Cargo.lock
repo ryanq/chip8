@@ -34,7 +34,7 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "chip8"
+name = "chirp8"
 version = "0.1.0"
 dependencies = [
  "clap 3.0.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",

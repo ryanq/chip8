@@ -12,9 +12,8 @@ use {
 };
 
 fn main() -> Result<(), Error> {
-    cli::configure_logging();
-
     let config = Config::parse();
+    cli::configure_logging(config.verbose);
 
     let mut c8 = Chip8::new(&config)?;
     c8.run()?;
